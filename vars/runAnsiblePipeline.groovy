@@ -7,8 +7,9 @@ def call(String configFile = 'pipeline.conf') {
         agent any
 
         options {
-            ansiColor('xterm')
             timestamps()
+            disableConcurrentBuilds()
+            buildDiscarder(logRotator(numToKeepStr: '10'))
         }
 
         stages {
@@ -35,7 +36,7 @@ def call(String configFile = 'pipeline.conf') {
                             branches: [[name: config['GIT_BRANCH'] ?: 'main']],
                             userRemoteConfigs: [[
                                 url: config['GIT_REPOSITORY_URL'],
-                                credentialsId: 'git-credentials-id'
+                                credentialsId: config['GIT_CREDENTIALS_ID'] ?: 'git-credentials-id'
                             ]]
                         ])
                     }
@@ -61,17 +62,19 @@ def call(String configFile = 'pipeline.conf') {
 
             stage('Playbook Execution') {
                 steps {
-                    script {
-                        dir(config['CODE_BASE_PATH'] ?: '.') {
-                            echo "Executing Ansible Playbook: ${config['ANSIBLE_PLAYBOOK']}"
-                            
-                            ansiblePlaybook(
-                                playbook: config['ANSIBLE_PLAYBOOK'] ?: 'site.yml',
-                                inventory: config['ANSIBLE_INVENTORY'] ?: 'inventory/hosts.ini',
-                                credentialsId: 'ec2-ssh-key-id',
-                                colorized: true,
-                                extras: '-v'
-                            )
+                    ansiColor('xterm') {
+                        script {
+                            dir(config['CODE_BASE_PATH'] ?: '.') {
+                                echo "Executing Ansible Playbook: ${config['ANSIBLE_PLAYBOOK']}"
+
+                                ansiblePlaybook(
+                                    playbook: config['ANSIBLE_PLAYBOOK'] ?: 'site.yml',
+                                    inventory: config['ANSIBLE_INVENTORY'] ?: 'inventory/vault_aws_ec2.yml',
+                                    credentialsId: config['SSH_CREDENTIALS_ID'] ?: 'ec2-ssh-key-id',
+                                    colorized: true,
+                                    extras: '-v'
+                                )
+                            }
                         }
                     }
                 }
